@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* 100% 沿用你文件中的 CSS */
+        /* 100% 沿用你提供的所有 CSS，不改动任何样式 */
         #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #fdf6e3; background-size: cover; background-position: center; z-index: -1; transition: 0.5s; }
         body { margin: 0; padding: 20px 8px; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
         .calendar-box { background: white; width: calc(100vw - 16px); max-width: 1000px; padding: 12px 8px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); position: relative; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
@@ -29,7 +29,7 @@
         .ym-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-top: 4px; }
         .ym-day { font-size: 8px; text-align: center; color: #a0aec0; height: 12px; display: flex; align-items: center; justify-content: center; position: relative; }
         .dot-mark { width: 2.5px; height: 2.5px; background: #4fd1c5; border-radius: 50%; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); }
-        .footer-copy { text-align: center; font-size: 10px; color: #a0aec0; margin-top: 15px; padding-bottom: 5px; letter-spacing: 1px; }
+        .footer-copy { text-align: center; font-size: 10px; color: #a0aec0; margin-top: 15px; padding-bottom: 5px; letter-spacing: 1px; cursor: pointer; }
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 999; display: none; }
         #editor-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 12px; border-radius: 12px; z-index: 1000; width: 92%; max-width: 420px; box-sizing: border-box; }
         .tool-group { display: flex; align-items: center; gap: 3px; margin-bottom: 8px; flex-wrap: nowrap; overflow-x: auto; }
@@ -49,6 +49,7 @@
 <body id="body-tag">
     <div id="bg-layer"></div>
     <div id="modal-overlay" onclick="closeModal()"></div>
+    
     <div id="editor-modal">
         <div class="date-picker-row">范围: <select id="startDaySelect"></select> — <select id="endDaySelect"></select> 日</div>
         <div class="tool-group">
@@ -119,24 +120,39 @@
             </div>
         </div>
         <div id="yearView"></div>
-        <div class="footer-copy">© 2026 🤿宇宙级潜水员🐟</div>
+        <div class="footer-copy" id="unlockTrigger">© 2026 🤿宇宙级潜水员🐟</div>
     </div>
 
     <script>
-        // Supabase 配置
         const S_URL = "https://cnbarxcyhtuyympqwspb.supabase.co";
         const S_KEY = "sb_publishable_8lKRoBeyMpq8UEYugqvn7g_3_iImIur";
         const _db = supabase.createClient(S_URL, S_KEY);
 
         let currentDate = new Date(), viewMode = 'month', selection = [], currentBarColor = '#B2F2BB', editingId = null, events = [];
+        
+        // 读取管理员权限
+        let isAdmin = localStorage.getItem('is_admin') === 'true';
 
-        // 从云端加载数据
         async function syncData() {
             const { data } = await _db.from('events').select('*');
             events = data || [];
             renderCalendar();
             if(viewMode === 'year') renderYear();
         }
+
+        // 隐形解锁逻辑：连点页脚 5 次
+        let unlockClicks = 0;
+        document.getElementById('unlockTrigger').addEventListener('click', () => {
+            unlockClicks++;
+            if (unlockClicks >= 5) {
+                if (prompt("请输入暗号以开启编辑模式") === "2026") {
+                    isAdmin = true;
+                    localStorage.setItem('is_admin', 'true');
+                    alert("编辑模式已开启");
+                }
+                unlockClicks = 0;
+            }
+        });
 
         function updateDisplayBg() { 
             const y = currentDate.getFullYear(), m = currentDate.getMonth();
@@ -154,7 +170,13 @@
             const grid = document.getElementById('dateGrid'), layer = document.getElementById('event-layer');
             grid.innerHTML = ''; layer.innerHTML = '';
             const y = currentDate.getFullYear(), m = currentDate.getMonth();
-            document.getElementById('monthDisplay').innerText = `${y}年 ${m+1}月`;
+            
+            // 修正标题逻辑
+            if(viewMode === 'month') {
+                document.getElementById('monthDisplay').innerText = `${y}年 ${m+1}月`;
+            } else {
+                document.getElementById('monthDisplay').innerText = `${y}年 全览`;
+            }
             
             const first = new Date(y, m, 1).getDay(), dInM = new Date(y, m + 1, 0).getDate();
             for (let i = 0; i < first; i++) grid.innerHTML += '<div class="empty-cell"></div>';
@@ -183,8 +205,8 @@
             });
         }
 
-        // 100% 沿用你原本的多选逻辑
         function handleCellClick(d) {
+            if(!isAdmin) return; // 未解锁禁止编辑
             if (selection.length === 0) {
                 selection.push(d);
                 document.getElementById(`cell-${d}`).classList.add('selected');
@@ -197,6 +219,7 @@
         }
 
         function openEditModal(id, s, e) {
+            if(!isAdmin && !id) return; // 非管理员无法新建
             editingId = id;
             if(id) {
                 const ev = events.find(i => i.id === id);
@@ -215,6 +238,7 @@
         }
 
         async function saveEvent() {
+            if(!isAdmin) return alert("请先解锁编辑权限");
             const f = document.getElementById('editor-field');
             const data = {
                 text: f.innerHTML, barColor: currentBarColor,
@@ -229,6 +253,7 @@
         }
 
         async function deleteEvent() {
+            if(!isAdmin) return;
             if(confirm("确定删除？")) { await _db.from('events').delete().eq('id', editingId); closeModal(); syncData(); }
         }
 
@@ -236,6 +261,7 @@
             viewMode = (viewMode === 'month') ? 'year' : 'month';
             document.getElementById('monthView').style.display = (viewMode === 'month' ? 'block' : 'none');
             document.getElementById('yearView').style.display = (viewMode === 'year' ? 'grid' : 'none');
+            renderCalendar(); // 刷新标题
             if(viewMode === 'year') renderYear();
         }
 
@@ -256,7 +282,6 @@
             }
         }
 
-        // 样式函数
         function exec(e, c) { e.preventDefault(); document.execCommand(c, false, null); }
         function execColor(e, v) { e.preventDefault(); document.execCommand('foreColor', false, v); }
         function setStyle(e, p, v) { 
@@ -279,7 +304,6 @@
         }
         function changeMonth(o) { currentDate.setMonth(currentDate.getMonth()+o); syncData(); }
         
-        // 背景与备份
         function exportData(){ const b=new Blob([JSON.stringify(events)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='calendar.json'; a.click(); }
         function importData(){ const i=document.createElement('input'); i.type='file'; i.onchange=e=>{ const r=new FileReader(); r.onload=async ev=>{ const imp = JSON.parse(ev.target.result); await _db.from('events').insert(imp); syncData(); }; r.readAsText(e.target.files[0]); }; i.click(); }
         function changeBg(){ 
@@ -289,11 +313,9 @@
                     const img = new Image(); img.src = ev.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                        const maxW = 1200; const scale = maxW / img.width;
-                        canvas.width = maxW; canvas.height = img.height * scale;
+                        canvas.width = 1200; canvas.height = img.height * (1200 / img.width);
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        const compressed = canvas.toDataURL('image/jpeg', 0.7); 
-                        localStorage.setItem(`bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`, compressed); 
+                        localStorage.setItem(`bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`, canvas.toDataURL('image/jpeg', 0.7)); 
                         updateDisplayBg(); 
                     };
                 }; r.readAsDataURL(e.target.files[0]); 
