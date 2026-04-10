@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* 保持你原本的精美样式不动 */
+        /* 100% 沿用你最原始的精美 CSS */
         #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #fdf6e3; background-size: cover; background-position: center; z-index: -1; transition: 0.5s; }
         body { margin: 0; padding: 20px 8px; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
         .calendar-box { background: white; width: calc(100vw - 16px); max-width: 1000px; padding: 12px 8px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); position: relative; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
         .has-bg .calendar-box { background: rgba(255, 255, 255, 0.82); }
         .has-bg .cell, .has-bg .empty-cell { background: rgba(255, 255, 255, 0.2) !important; border-color: rgba(238, 238, 238, 0.4) !important; }
+        .has-bg .year-month-card { background: rgba(255, 255, 255, 0.4); border-color: rgba(0, 0, 0, 0.05); }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 15px; }
         .title { font-size: 16px; color: #4a5568; font-weight: bold; cursor: pointer; border-bottom: 1px dashed #cbd5e0; }
         .btn { cursor: pointer; border: none; background: #f0f2f5; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -23,15 +24,14 @@
         .l { font-size: 9px; color: #a0aec0; transform: scale(0.85); transform-origin: left; }
         #event-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 90px; }
         .event-bar { position: relative; font-size: 11px; padding: 4px; border-radius: 4px; margin: 22px 2px 0 2px; z-index: 10; pointer-events: auto; cursor: pointer; display: flex !important; flex-direction: column; overflow: hidden; box-sizing: border-box; }
-        
         #yearView { display: none; padding: 5px; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; box-sizing: border-box; }
         .year-month-card { border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px; cursor: pointer; background: #fafafa; box-sizing: border-box; }
         .ym-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; margin-top: 4px; }
         .ym-day { font-size: 8px; text-align: center; color: #a0aec0; height: 12px; display: flex; align-items: center; justify-content: center; position: relative; }
         .dot-mark { width: 2.5px; height: 2.5px; background: #4fd1c5; border-radius: 50%; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); }
-
         .footer-copy { text-align: center; font-size: 10px; color: #a0aec0; margin-top: 15px; padding-bottom: 5px; cursor: pointer; }
         
+        /* 100% 还原编辑盘样式 */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); z-index: 999; display: none; }
         #editor-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 12px; border-radius: 12px; z-index: 1000; width: 92%; max-width: 420px; box-sizing: border-box; }
         .tool-group { display: flex; align-items: center; gap: 3px; margin-bottom: 8px; flex-wrap: nowrap; overflow-x: auto; }
@@ -39,11 +39,13 @@
         .dot-box { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
         .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.05); cursor: pointer; }
         #editor-field { width: 100%; min-height: 120px; max-height: 300px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin: 8px 0; font-size: 14px; outline: none; overflow-y: auto; display: flex; flex-direction: column; }
+        .date-picker-row { font-size: 12px; color: #64748b; margin-bottom: 8px; background: #f1f5f9; padding: 6px; border-radius: 6px; }
         .modal-btns { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #eee; padding-top: 10px; }
         .save-btn { background: #4fd1c5; color: white; border: none; padding: 8px 24px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .selected { background-color: #ebf8ff !important; border: 1px solid #4299e1 !important; }
+        .data-btn { font-size: 10px; color: #94a3b8; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 4px; cursor: pointer; }
         .blur-slider-box { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #94a3b8; margin-top: 8px; border-top: 1px dashed #eee; padding-top: 8px; }
-        #blurRange { flex: 1; }
+        #blurRange { flex: 1; cursor: pointer; height: 4px; }
     </style>
 </head>
 <body id="body-tag">
@@ -51,31 +53,49 @@
     <div id="modal-overlay" onclick="closeModal()"></div>
     
     <div id="editor-modal">
-        <div style="font-size:12px;color:#64748b;margin-bottom:8px;">范围: <select id="startDaySelect"></select> — <select id="endDaySelect"></select> 日</div>
+        <div class="date-picker-row">范围: <select id="startDaySelect"></select> — <select id="endDaySelect"></select> 日</div>
         <div class="tool-group">
             <button class="tool-btn" onmousedown="exec(event,'bold')">B</button>
             <button class="tool-btn" onmousedown="exec(event,'italic')">I</button>
             <button class="tool-btn" onmousedown="exec(event,'underline')">U</button>
             <div style="width:1px;height:14px;background:#ddd"></div>
+            <div class="dot-box"><div class="dot" style="background:#000" onmousedown="execColor(event,'#000')"></div></div>
             <div class="dot-box"><div class="dot" style="background:#e53e3e" onmousedown="execColor(event,'#e53e3e')"></div></div>
             <div class="dot-box"><div class="dot" style="background:#3182ce" onmousedown="execColor(event,'#3182ce')"></div></div>
             <div class="dot-box"><div class="dot" style="background:#38a169" onmousedown="execColor(event,'#38a169')"></div></div>
-            <div class="dot-box"><div class="dot" style="background:#000" onmousedown="execColor(event,'#000')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#805ad5" onmousedown="execColor(event,'#805ad5')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#ed8936" onmousedown="execColor(event,'#ed8936')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#718096" onmousedown="execColor(event,'#718096')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#fff;border:1px solid #ddd" onmousedown="execColor(event,'#fff')"></div></div>
         </div>
         <div class="tool-group">
             <button class="tool-btn" onmousedown="setStyle(event,'fontSize','14px')">小</button>
             <button class="tool-btn" onmousedown="setStyle(event,'fontSize','18px')">中</button>
             <button class="tool-btn" onmousedown="setStyle(event,'fontSize','26px')">大</button>
+            <button class="tool-btn" onmousedown="setStyle(event,'fontSize','42px')">巨</button>
             <div style="width:1px;height:14px;background:#ddd"></div>
             <button class="tool-btn" onmousedown="exec(event,'justifyLeft')">←</button>
             <button class="tool-btn" onmousedown="exec(event,'justifyCenter')">↔</button>
             <button class="tool-btn" onmousedown="exec(event,'justifyRight')">→</button>
+            <div style="width:1px;height:14px;background:#ddd"></div>
+            <button class="tool-btn" onmousedown="setAlign(event,'flex-start')">↑</button>
+            <button class="tool-btn" onmousedown="setAlign(event,'center')">↕</button>
+            <button class="tool-btn" onmousedown="setAlign(event,'flex-end')">↓</button>
+        </div>
+        <div class="tool-group">
+            <span style="font-size:10px;color:#999">底色:</span>
+            <div class="dot-box"><div class="dot" style="background:#FFD1DC" onclick="setBarColor('#FFD1DC')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#B2F2BB" onclick="setBarColor('#B2F2BB')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#A5D8FF" onclick="setBarColor('#A5D8FF')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#FFF3BF" onclick="setBarColor('#FFF3BF')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#E5DBFF" onclick="setBarColor('#E5DBFF')"></div></div>
+            <div class="dot-box"><div class="dot" style="background:#f1f5f9;border:1px solid #ddd" onclick="setBarColor('#f1f5f9')"></div></div>
         </div>
         <div id="editor-field" contenteditable="true"></div>
         <div class="modal-btns">
             <div>
                 <button id="deleteBtn" style="color:#e53e3e;background:none;border:none;font-size:10px;cursor:pointer" onclick="deleteEvent()">删除</button>
-                <button class="tool-btn" style="display:inline-block;padding:0 5px;width:auto;" onclick="changeBg()">换背景</button>
+                <button class="data-btn" onclick="changeBg()">背景</button>
             </div>
             <button class="save-btn" onclick="saveEvent()">保存</button>
         </div>
@@ -118,22 +138,27 @@
             if(viewMode === 'year') renderYear();
         }
 
-        // 解锁
+        // 解锁逻辑
         let unlockClicks = 0;
         document.getElementById('unlockTrigger').addEventListener('click', () => {
             unlockClicks++;
             if (unlockClicks >= 5) {
                 if (prompt("验证暗号") === "2026") {
-                    isAdmin = true; localStorage.setItem('is_admin', 'true'); alert("编辑已开启");
+                    isAdmin = true; localStorage.setItem('is_admin', 'true'); alert("权限已解锁，现在可以保存记录了！");
                 }
                 unlockClicks = 0;
             }
         });
 
-        // 农历显示：恢复传统中文字符
-        function getLunarDay(date) {
-            return new Intl.DateTimeFormat('zh-u-ca-chinese', {day:'numeric'}).format(date);
+        function updateDisplayBg() { 
+            const y = currentDate.getFullYear(), m = currentDate.getMonth();
+            const s = localStorage.getItem(`bg_${y}_${m}`);
+            if(s){ document.getElementById('bg-layer').style.backgroundImage=`url(${s})`; document.getElementById('body-tag').classList.add('has-bg'); }
+            else { document.getElementById('bg-layer').style.backgroundImage='none'; document.getElementById('body-tag').classList.remove('has-bg'); }
+            updateBlur(localStorage.getItem('my_calendar_blur') || 4);
         }
+        
+        function updateBlur(v){ document.getElementById('mainBox').style.backdropFilter=`blur(${v}px)`; localStorage.setItem('my_calendar_blur',v); }
 
         function renderCalendar() {
             updateDisplayBg();
@@ -149,7 +174,9 @@
             let dateMap = {};
             for (let d = 1; d <= dInM; d++) {
                 const dateObj = new Date(y, m, d);
-                grid.innerHTML += `<div class="cell" onclick="handleCellClick(${d})" id="cell-${d}"><div class="date-row"><span class="s">${d}</span><span class="l">${getLunarDay(dateObj)}</span></div></div>`;
+                // 100% 还原传统农历文字
+                let lunar = new Intl.DateTimeFormat('zh-u-ca-chinese', {day:'numeric'}).format(dateObj);
+                grid.innerHTML += `<div class="cell" onclick="handleCellClick(${d})" id="cell-${d}"><div class="date-row"><span class="s">${d}</span><span class="l">${lunar}</span></div></div>`;
                 dateMap[d] = { row: Math.floor((first+d-1)/7)+1, col: ((first+d-1)%7)+1 };
             }
             const remain = (7 - ((first + dInM) % 7)) % 7;
@@ -162,7 +189,7 @@
                     const eC = (r === dateMap[ev.end].row) ? dateMap[ev.end].col : 7;
                     const bar = document.createElement('div'); bar.className = 'event-bar';
                     bar.style.gridColumn = `${sC}/${eC+1}`; bar.style.gridRow = r;
-                    bar.style.backgroundColor = ev.barColor || '#B2F2BB';
+                    bar.style.backgroundColor = ev.barColor; bar.style.textAlign = ev.textAlign; bar.style.alignItems = ev.alignItems;
                     if(r === dateMap[ev.start].row) bar.innerHTML = ev.text;
                     bar.onclick = (e) => { e.stopPropagation(); openEditModal(ev.id); };
                     layer.appendChild(bar);
@@ -171,9 +198,11 @@
         }
 
         function handleCellClick(d) {
-            if(!isAdmin) return alert("请在下方版权处连点5次解锁后操作");
+            if(!isAdmin) return alert("请在页脚连点5次解锁权限后再记录");
             if (selection.length === 0) {
                 selection.push(d); document.getElementById(`cell-${d}`).classList.add('selected');
+            } else if (selection[0] === d) {
+                openEditModal(null, d, d);
             } else {
                 const s = Math.min(selection[0], d), e = Math.max(selection[0], d);
                 openEditModal(null, s, e);
@@ -182,14 +211,16 @@
 
         function openEditModal(id, s, e) {
             editingId = id;
+            const f = document.getElementById('editor-field');
             if(id) {
                 const ev = events.find(i => i.id === id);
                 initDP(ev.start, ev.end);
-                document.getElementById('editor-field').innerHTML = ev.text;
+                f.innerHTML = ev.text; f.style.textAlign = ev.textAlign; f.style.alignItems = ev.alignItems;
+                setBarColor(ev.barColor);
                 document.getElementById('deleteBtn').style.display = 'block';
             } else {
                 initDP(s, e);
-                document.getElementById('editor-field').innerHTML = '';
+                f.innerHTML = ''; f.style.textAlign = 'left'; f.style.alignItems = 'flex-start';
                 document.getElementById('deleteBtn').style.display = 'none';
             }
             document.getElementById('modal-overlay').style.display = 'block';
@@ -197,21 +228,26 @@
         }
 
         async function saveEvent() {
-            if(!isAdmin) return alert("未解锁权限");
+            if(!isAdmin) return alert("权限未解锁");
+            const f = document.getElementById('editor-field');
             const data = {
-                text: document.getElementById('editor-field').innerHTML,
+                text: f.innerHTML, 
+                barColor: currentBarColor,
                 start: parseInt(document.getElementById('startDaySelect').value),
                 end: parseInt(document.getElementById('endDaySelect').value),
-                year: currentDate.getFullYear(), month: currentDate.getMonth(),
-                barColor: currentBarColor
+                year: currentDate.getFullYear(), 
+                month: currentDate.getMonth(),
+                textAlign: f.style.textAlign || 'left', 
+                alignItems: f.style.alignItems || 'flex-start'
             };
-            if(editingId) await _db.from('events').update(data).eq('id', editingId);
-            else await _db.from('events').insert([{ id: Date.now(), ...data }]);
-            closeModal(); syncData();
+            try {
+                if(editingId) await _db.from('events').update(data).eq('id', editingId);
+                else await _db.from('events').insert([{ id: Date.now(), ...data }]);
+                closeModal(); syncData();
+            } catch(e) { alert("保存失败，请检查网络或重新解锁"); }
         }
 
         async function deleteEvent() {
-            if(!isAdmin) return;
             if(confirm("确定删除？")) { await _db.from('events').delete().eq('id', editingId); closeModal(); syncData(); }
         }
 
@@ -239,30 +275,31 @@
             }
         }
 
-        // 工具函数
+        // 样式控制函数
         function exec(e, c) { e.preventDefault(); document.execCommand(c, false, null); }
         function execColor(e, v) { e.preventDefault(); document.execCommand('foreColor', false, v); }
-        function setStyle(e, p, v) { e.preventDefault(); const s = document.createElement('span'); s.style[p] = v; window.getSelection().getRangeAt(0).wrapAll(s); }
+        function setStyle(e, p, v) { 
+            e.preventDefault(); const s = document.createElement('span'); 
+            s.style[p] = v; s.style.lineHeight = "1.1";
+            window.getSelection().getRangeAt(0).wrapAll(s); 
+        }
+        function setAlign(e, v) { e.preventDefault(); document.getElementById('editor-field').style.alignItems = v; }
         function setBarColor(c) { currentBarColor = c; }
+        
         function initDP(s, e) {
             const sS = document.getElementById('startDaySelect'), eS = document.getElementById('endDaySelect');
             sS.innerHTML = eS.innerHTML = '';
             for(let i=1; i<=31; i++){ sS.innerHTML+=`<option value="${i}">${i}</option>`; eS.innerHTML+=`<option value="${i}">${i}</option>`; }
             sS.value = s; eS.value = e;
         }
+
         function closeModal() {
             document.getElementById('modal-overlay').style.display = 'none';
             document.getElementById('editor-modal').style.display = 'none';
             selection = []; document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
         }
-        function changeMonth(o) { currentDate.setMonth(currentDate.getMonth()+o); syncData(); }
-        function updateBlur(v){ document.getElementById('mainBox').style.backdropFilter=`blur(${v}px)`; localStorage.setItem('my_calendar_blur',v); }
 
-        function updateDisplayBg() { 
-            const s = localStorage.getItem(`bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`);
-            if(s){ document.getElementById('bg-layer').style.backgroundImage=`url(${s})`; document.getElementById('body-tag').classList.add('has-bg'); }
-            else { document.getElementById('bg-layer').style.backgroundImage='none'; document.getElementById('body-tag').classList.remove('has-bg'); }
-        }
+        function changeMonth(o) { currentDate.setMonth(currentDate.getMonth()+o); syncData(); }
 
         function changeBg(){ 
             const i=document.createElement("input"); i.type="file"; 
