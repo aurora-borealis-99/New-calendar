@@ -8,107 +8,104 @@
     <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
     
     <style>
-        /* 恢复你最喜欢的视觉样式 */
         :root { --bg: #fff5f5; --primary: #feb2b2; --text: #4a5568; }
         body { 
-            font-family: -apple-system, "PingFang SC", sans-serif; 
-            background: var(--bg); 
+            font-family: -apple-system, sans-serif; 
+            background: var(--bg);
             background-image: url('https://images.unsplash.com/photo-1519750783826-e2420f4d687f?auto=format&fit=crop&w=1000&q=80');
             background-size: cover;
-            background-position: center;
+            background-attachment: fixed;
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; 
         }
         
         #calendar-container { 
-            width: 92%; max-width: 400px; 
+            width: 90%; max-width: 400px; 
             background: rgba(255,255,255,0.85); 
-            backdrop-filter: blur(15px); 
-            border-radius: 30px; padding: 25px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.1); 
-            border: 1px solid rgba(255,255,255,0.3);
+            backdrop-filter: blur(10px); 
+            border-radius: 25px; padding: 20px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
         }
 
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header h3 { margin: 0; cursor: pointer; color: var(--text); letter-spacing: 1px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; position: relative; }
         
-        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; position: relative; }
+        /* 确保格子有高度，否则看不见 */
         .cell { 
-            aspect-ratio: 1; border-radius: 12px; border: 1px solid rgba(237, 242, 247, 0.5);
-            display: flex; flex-direction: column; justify-content: space-between; padding: 5px; 
-            background: rgba(255,255,255,0.5); cursor: pointer; transition: 0.2s;
+            aspect-ratio: 1; border-radius: 8px; background: rgba(255,255,255,0.4);
+            border: 1px solid rgba(0,0,0,0.05); display: flex; flex-direction: column;
+            padding: 4px; font-size: 12px; cursor: pointer;
         }
-        .cell:hover { background: white; transform: translateY(-2px); }
-        .empty-cell { aspect-ratio: 1; opacity: 0.3; }
+        .empty-cell { aspect-ratio: 1; }
         
-        .date-num { font-size: 14px; font-weight: 600; }
-        .lunar-num { font-size: 9px; color: #a0aec0; }
+        .lunar-text { font-size: 8px; color: #a0aec0; margin-top: 2px; }
 
-        /* 记录条样式 */
-        .event-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; z-index: 5; }
+        .event-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; z-index: 10; }
         .event-bar { 
-            pointer-events: auto; height: 18px; margin-top: 24px; font-size: 10px; 
-            background: var(--primary); color: white; padding: 0 6px; border-radius: 6px; 
-            display: flex; align-items: center; cursor: pointer; white-space: nowrap; overflow: hidden;
-            box-shadow: 0 2px 5px rgba(254,178,178,0.5);
+            pointer-events: auto; height: 16px; margin-top: 20px; font-size: 9px; 
+            background: var(--primary); color: white; padding: 0 4px; border-radius: 4px; 
+            display: flex; align-items: center; overflow: hidden;
         }
 
-        /* 登录框样式 */
         #login-modal { 
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: white; padding: 30px; border-radius: 25px; box-shadow: 0 15px 50px rgba(0,0,0,0.3); 
-            z-index: 100; text-align: center; border: 2px solid var(--primary);
+            background: white; padding: 20px; border-radius: 20px; z-index: 100; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-        input { border: 1px solid #eee; padding: 10px; border-radius: 10px; margin-bottom: 15px; outline: none; width: 80%; }
-        .btn { border: none; background: var(--primary); color: white; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-        
-        .status-footer { text-align: center; font-size: 10px; color: #a0aec0; margin-top: 20px; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div id="calendar-container">
     <div class="header">
-        <button class="btn" style="padding:5px 10px" onclick="changeMonth(-1)">←</button>
+        <button onclick="changeMonth(-1)">←</button>
         <h3 id="monthDisplay" onclick="handleTitleClick()">加载中...</h3>
-        <button class="btn" style="padding:5px 10px" onclick="changeMonth(1)">→</button>
+        <button onclick="changeMonth(1)">→</button>
     </div>
-    
     <div style="position: relative;">
         <div class="grid" id="dateGrid"></div>
         <div class="event-layer" id="eventLayer"></div>
     </div>
-    
-    <div class="status-footer" id="statusLine">☁️ 访客模式 (只读)</div>
+    <div style="text-align:center; font-size:10px; color:#a0aec0; margin-top:15px;" id="statusLine">☁️ 正在连接云端...</div>
 </div>
 
-<div id="login-modal">
-    <h3 style="margin-top:0; color:var(--text)">验证身份</h3>
-    <input type="password" id="passInput" placeholder="输入四位暗号">
-    <br>
-    <button class="btn" onclick="checkPass()">解锁编辑</button>
+<div id="login-modal" id="loginModal">
+    <input type="password" id="passInput" placeholder="暗号">
+    <button onclick="checkPass()">登录</button>
 </div>
 
 <script>
-    // 配置你的专属钥匙
+    // 你的配置
     const S_URL = "https://cnbarxcyhtuyympqwspb.supabase.co";
     const S_KEY = "Sb_publishable_8lKRoBeyMpq8UEYugqvn7g_3_iImIur";
-    const _db = supabase.createClient(S_URL, S_KEY);
+    let _db;
 
     let curr = new Date();
     let events = [];
     let isAdmin = false;
     let clickHeaderTimes = 0;
 
-    // 1. 获取云端数据
+    // 初始化 Supabase
+    function init() {
+        try {
+            _db = supabase.createClient(S_URL, S_KEY);
+            loadData();
+        } catch (e) {
+            document.getElementById('statusLine').innerText = "❌ 库加载失败，请刷新";
+        }
+    }
+
     async function loadData() {
         const { data, error } = await _db.from('events').select('*');
-        if (!error) {
+        if (error) {
+            console.error(error);
+            document.getElementById('statusLine').innerText = "⚠️ 云端连接失败，请检查 RLS";
+        } else {
             events = data.map(e => ({ id: e.id, date: e.event_date, text: e.content }));
+            document.getElementById('statusLine').innerText = "☁️ 访客模式 (只读)";
             render();
         }
     }
 
-    // 2. 渲染核心逻辑
     function render() {
         const grid = document.getElementById('dateGrid');
         const layer = document.getElementById('eventLayer');
@@ -120,32 +117,27 @@
         const firstDay = new Date(y, m, 1).getDay();
         const daysInMonth = new Date(y, m + 1, 0).getDate();
         
-        // 补月初空格
         for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div class="empty-cell"></div>';
         
-        // 渲染每一天
         for (let d = 1; d <= daysInMonth; d++) {
-            const dateObj = new Date(y, m, d);
-            const lunar = Solar.fromDate(dateObj).getLunar();
-            const lunarText = lunar.getDayInChinese();
-            
-            // 日期格子
+            // 农历计算
+            let lunarTxt = "";
+            try {
+                const dateObj = new Date(y, m, d);
+                lunarTxt = Solar.fromDate(dateObj).getLunar().getDayInChinese();
+            } catch(e) { lunarTxt = ""; }
+
             grid.innerHTML += `
                 <div class="cell" onclick="addEvent(${d})">
-                    <div class="date-row">
-                        <span class="date-num">${d}</span>
-                        <span class="lunar-num">${lunarText}</span>
-                    </div>
+                    <span>${d}</span>
+                    <span class="lunar-text">${lunarTxt}</span>
                 </div>`;
             
-            // 渲染该日的云端事件
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const dayEvents = events.filter(e => e.date === dateStr);
-            
             dayEvents.forEach(e => {
                 const bar = document.createElement('div');
                 bar.className = 'event-bar';
-                // 计算位置
                 const pos = firstDay + d - 1;
                 bar.style.gridColumn = (pos % 7) + 1;
                 bar.style.gridRow = Math.floor(pos / 7) + 1;
@@ -154,36 +146,14 @@
                 layer.appendChild(bar);
             });
         }
-
-        // 补月末空格 (解决你之前发现的问题)
-        const total = firstDay + daysInMonth;
-        const remain = (7 - (total % 7)) % 7;
-        for (let i = 0; i < remain; i++) grid.innerHTML += '<div class="empty-cell"></div>';
+        
+        // 补全末尾
+        const totalCells = firstDay + daysInMonth;
+        const remaining = (7 - (totalCells % 7)) % 7;
+        for (let i = 0; i < remaining; i++) grid.innerHTML += '<div class="empty-cell"></div>';
     }
 
-    // 3. 交互功能
-    async function addEvent(d) {
-        if (!isAdmin) {
-            alert("请先点击上方月份连点5次验证身份");
-            return;
-        }
-        const txt = prompt("📝 记录点什么？");
-        if (!txt) return;
-        const dateStr = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const { error } = await _db.from('events').insert([{ event_date: dateStr, content: txt, color: '#feb2b2' }]);
-        if (error) alert("保存失败: " + error.message);
-        else loadData();
-    }
-
-    async function deleteEvent(id) {
-        if (!isAdmin) return;
-        if (confirm("确定要删除这条记录吗？")) {
-            const { error } = await _db.from('events').delete().eq('id', id);
-            if (!error) loadData();
-        }
-    }
-
-    // 4. 权限逻辑
+    // 交互逻辑
     function handleTitleClick() {
         clickHeaderTimes++;
         if (clickHeaderTimes >= 5) {
@@ -193,23 +163,36 @@
     }
 
     function checkPass() {
-        const val = document.getElementById('passInput').value;
-        if (val === "2026") { // 预设暗号 2026
+        if (document.getElementById('passInput').value === "2026") {
             isAdmin = true;
-            document.getElementById('statusLine').innerText = "✨ 管理员模式 (可编辑)";
+            document.getElementById('statusLine').innerText = "✨ 管理员模式";
             document.getElementById('login-modal').style.display = 'none';
-            alert("解锁成功！现在点击日期可以记录，点击条目可以删除。");
-        } else {
-            alert("暗号不对哦");
-        }
+            alert("解锁成功！");
+        } else { alert("暗号错误"); }
+    }
+
+    async function addEvent(d) {
+        if (!isAdmin) return alert("请先验证身份");
+        const txt = prompt("输入记录内容:");
+        if (!txt) return;
+        const dateStr = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        await _db.from('events').insert([{ event_date: dateStr, content: txt, color: '#feb2b2' }]);
+        loadData();
+    }
+
+    async function deleteEvent(id) {
+        if (!isAdmin || !confirm("确定删除？")) return;
+        await _db.from('events').delete().eq('id', id);
+        loadData();
     }
 
     function changeMonth(s) {
         curr.setMonth(curr.getMonth() + s);
-        loadData();
+        render();
     }
 
-    window.onload = loadData;
+    // 关键：确保库加载完再运行
+    window.addEventListener('load', init);
 </script>
 </body>
 </html>
