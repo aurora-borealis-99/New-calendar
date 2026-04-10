@@ -8,72 +8,77 @@
     <script src="https://cdn.jsdelivr.net/npm/lunar-javascript/lunar.js"></script>
     
     <style>
-        :root { --primary: #feb2b2; --bg-soft: rgba(255, 245, 245, 0.85); }
+        :root { --primary: #feb2b2; --bg-overlay: rgba(255, 245, 245, 0.88); }
         
         body { 
-            font-family: -apple-system, "PingFang SC", sans-serif; 
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; 
             margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh;
-            /* 找回你喜欢的背景图 */
             background-image: url('https://images.unsplash.com/photo-1519750783826-e2420f4d687f?auto=format&fit=crop&w=1000&q=80');
             background-size: cover; background-position: center; background-attachment: fixed;
         }
 
         #calendar-container { 
             width: 92%; max-width: 400px; 
-            background: var(--bg-soft); 
-            backdrop-filter: blur(15px); 
+            background: var(--bg-overlay); 
+            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
             border-radius: 30px; padding: 25px; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
-            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.4);
+            box-sizing: border-box;
         }
 
+        /* 顶部导航 */
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .header h3 { margin: 0; color: #4a5568; cursor: pointer; letter-spacing: 1px; font-size: 1.2rem; }
-        
-        /* 找回漂亮的网格布局 */
-        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; position: relative; }
+        .header h3 { margin: 0; color: #4a5568; cursor: pointer; letter-spacing: 2px; font-size: 1.3rem; text-shadow: 1px 1px 2px rgba(255,255,255,0.5); }
+        .nav-btn { border: none; background: white; color: var(--primary); width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.05); transition: 0.2s; }
+        .nav-btn:active { transform: scale(0.9); }
+
+        /* 日历网格 */
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; position: relative; }
         
         .cell { 
-            aspect-ratio: 1; border-radius: 12px; background: rgba(255,255,255,0.5);
-            border: 1px solid rgba(237, 242, 247, 0.6); display: flex; flex-direction: column;
-            padding: 6px; cursor: pointer; transition: all 0.2s; position: relative;
+            aspect-ratio: 1; border-radius: 14px; background: rgba(255,255,255,0.6);
+            border: 1px solid rgba(237, 242, 247, 0.8); display: flex; flex-direction: column;
+            padding: 8px; cursor: pointer; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-sizing: border-box; position: relative; z-index: 2;
         }
-        .cell:hover { background: white; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-        .empty-cell { aspect-ratio: 1; opacity: 0; }
+        .cell:hover { background: white; transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+        .empty-cell { aspect-ratio: 1; pointer-events: none; }
         
-        .date-num { font-size: 15px; font-weight: 600; color: #2d3748; }
-        .lunar-num { font-size: 9px; color: #a0aec0; margin-top: 2px; }
+        .date-num { font-size: 16px; font-weight: 700; color: #2d3748; line-height: 1; }
+        .lunar-num { font-size: 10px; color: #a0aec0; margin-top: 4px; font-weight: 400; }
 
-        /* 找回优雅的记录条样式 */
-        .event-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; z-index: 5; }
+        /* 记录条样式 - 叠加在日历上 */
+        .event-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(7, 1fr); pointer-events: none; z-index: 10; }
         .event-bar { 
-            pointer-events: auto; height: 18px; margin-top: 26px; font-size: 10px; 
+            pointer-events: auto; height: 18px; margin-top: 30px; font-size: 10px; 
             background: var(--primary); color: white; padding: 0 6px; border-radius: 6px; 
             display: flex; align-items: center; overflow: hidden; white-space: nowrap;
-            box-shadow: 0 2px 5px rgba(254,178,178,0.4);
+            box-shadow: 0 3px 6px rgba(254,178,178,0.4); margin-left: 4px; margin-right: 4px;
         }
 
-        .btn-nav { border: none; background: white; color: var(--primary); width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-        
-        #status-line { text-align: center; font-size: 11px; color: #a0aec0; margin-top: 25px; letter-spacing: 1px; }
+        #status-bar { text-align: center; font-size: 11px; color: #a0aec0; margin-top: 25px; font-weight: 300; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
 <div id="calendar-container">
     <div class="header">
-        <button class="btn-nav" onclick="changeMonth(-1)">←</button>
+        <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
         <h3 id="monthTitle" onclick="handleLogin()">...</h3>
-        <button class="btn-nav" onclick="changeMonth(1)">→</button>
+        <button class="nav-btn" onclick="changeMonth(1)">›</button>
     </div>
+    
     <div style="position: relative;">
         <div class="grid" id="dateGrid"></div>
         <div class="event-layer" id="eventLayer"></div>
     </div>
-    <div id="status-line">☁️ 正在同步云端...</div>
+    
+    <div id="status-bar">☁️ 正在连接云端...</div>
 </div>
 
 <script>
+    // 你的配置信息
     const S_URL = "https://cnbarxcyhtuyympqwspb.supabase.co";
     const S_KEY = "sb_publishable_8lKRoBeyMpq8UEYugqvn7g_3_iImIur";
     const _db = supabase.createClient(S_URL, S_KEY);
@@ -83,19 +88,22 @@
     let isAdmin = false;
     let clickCount = 0;
 
-    async function loadData() {
+    // 1. 初始化及云端加载
+    async function init() {
+        const status = document.getElementById('status-bar');
         try {
             const { data, error } = await _db.from('events').select('*');
             if (error) throw error;
             events = data || [];
-            document.getElementById('status-line').innerText = isAdmin ? "✨ 管理员模式" : "☁️ 访客模式 (只读)";
-            render();
+            status.innerText = isAdmin ? "✨ 管理员模式 (已解锁)" : "☁️ 访客模式 (只读)";
         } catch (e) {
-            document.getElementById('status-line').innerText = "❌ 连接异常: " + e.message;
-            render();
+            console.error(e);
+            status.innerText = "⚠️ 离线模式: 无法同步云端";
         }
+        render(); // 无论成败，都渲染界面
     }
 
+    // 2. 渲染主逻辑 (核心修复)
     function render() {
         const grid = document.getElementById('dateGrid');
         const layer = document.getElementById('eventLayer');
@@ -107,66 +115,100 @@
         const firstDay = new Date(y, m, 1).getDay();
         const daysInMonth = new Date(y, m + 1, 0).getDate();
         
-        // 补全月初空格
+        // 补全月初空白
         for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div class="empty-cell"></div>';
         
-        // 渲染日期
+        // 循环生成日期
         for (let d = 1; d <= daysInMonth; d++) {
-            const lunar = Solar.fromDate(new Date(y, m, d)).getLunar().getDayInChinese();
+            // 计算农历
+            const dateObj = new Date(y, m, d);
+            let lunarText = "加载中";
+            try {
+                lunarText = Solar.fromDate(dateObj).getLunar().getDayInChinese();
+            } catch(e) { lunarText = ""; }
+
+            // 创建格子
             grid.innerHTML += `
                 <div class="cell" onclick="addNote(${d})">
                     <span class="date-num">${d}</span>
-                    <span class="lunar-num">${lunar}</span>
+                    <span class="lunar-num">${lunarText}</span>
                 </div>`;
             
+            // 匹配并创建云端数据条
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            events.filter(e => e.event_date === dateStr).forEach(e => {
+            const dayEvents = events.filter(e => e.event_date === dateStr);
+            
+            dayEvents.forEach(e => {
                 const bar = document.createElement('div');
                 bar.className = 'event-bar';
                 const pos = firstDay + d - 1;
                 bar.style.gridColumn = (pos % 7) + 1;
                 bar.style.gridRow = Math.floor(pos / 7) + 1;
                 bar.innerText = e.content;
+                // 点击条目可以删除（仅限管理员）
                 bar.onclick = (ev) => { ev.stopPropagation(); deleteNote(e.id); };
                 layer.appendChild(bar);
             });
         }
         
-        // 补全月末空格 (解决你之前反映的格子不齐问题)
-        const total = firstDay + daysInMonth;
-        const remain = (7 - (total % 7)) % 7;
-        for (let i = 0; i < remain; i++) grid.innerHTML += '<div class="empty-cell"></div>';
+        // 3. 补全月末空白 (解决右下角缺失)
+        const totalUsed = firstDay + daysInMonth;
+        const remaining = (7 - (totalUsed % 7)) % 7;
+        for (let i = 0; i < remaining; i++) grid.innerHTML += '<div class="empty-cell"></div>';
     }
 
+    // --- 交互逻辑 ---
+
     function handleLogin() {
-        if (++clickCount >= 5) {
-            if (prompt("请输入管理员暗号：") === "2026") {
+        clickCount++;
+        if (clickCount >= 5) {
+            const pass = prompt("请输入暗号：");
+            if (pass === "2026") {
                 isAdmin = true;
-                alert("欢迎回来，管理员！");
-                loadData();
+                init();
+                alert("管理员认证成功！");
+            } else {
+                alert("暗号错误。");
             }
             clickCount = 0;
         }
     }
 
     async function addNote(d) {
-        if (!isAdmin) return alert("请连点标题5次登录后编辑");
-        const txt = prompt("📝 今天的记录：");
-        if (!txt) return;
+        if (!isAdmin) {
+            alert("🔒 访客模式无法记录，请点击上方月份连点5次验证身份。");
+            return;
+        }
+        const text = prompt(`📝 在 ${d} 日记录：`);
+        if (!text) return;
+        
         const dateStr = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        await _db.from('events').insert([{ event_date: dateStr, content: txt, color: 'pink' }]);
-        loadData();
+        const { error } = await _db.from('events').insert([
+            { event_date: dateStr, content: text, color: 'pink' }
+        ]);
+        
+        if (error) {
+            alert("保存失败: " + error.message);
+        } else {
+            init(); // 重新加载数据并重绘
+        }
     }
 
     async function deleteNote(id) {
-        if (!isAdmin || !confirm("确定删除？")) return;
-        await _db.from('events').delete().eq('id', id);
-        loadData();
+        if (!isAdmin) return;
+        if (confirm("确定删除这条记录吗？")) {
+            const { error } = await _db.from('events').delete().eq('id', id);
+            if (!error) init();
+        }
     }
 
-    function changeMonth(n) { curr.setMonth(curr.getMonth() + n); loadData(); }
+    function changeMonth(n) {
+        curr.setMonth(curr.getMonth() + n);
+        init(); // 翻页时重新连接数据库获取新数据
+    }
 
-    window.onload = loadData;
+    // 页面加载启动
+    window.onload = init;
 </script>
 </body>
 </html>
