@@ -9,7 +9,7 @@
         body { margin: 0; padding: 20px 8px; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
         .calendar-box { background: white; width: calc(100vw - 16px); max-width: 1000px; padding: 12px 8px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); position: relative; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
         
-        /* 【修改处 1】不透明度调低到 0.4，让背景更清透 */
+        /* 保持 0.4 的清透度 */
         .has-bg .calendar-box { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         
         .has-bg .cell, .has-bg .empty-cell { background: rgba(255, 255, 255, 0.2) !important; border-color: rgba(238, 238, 238, 0.4) !important; }
@@ -128,7 +128,7 @@
         async function syncData() {
             const { data } = await _db.from('events').select('*');
             events = data || [];
-            await updateDisplayBg();
+            await updateDisplayBg(); 
             if(viewMode === 'year') renderYear(); else renderCalendar();
         }
 
@@ -222,7 +222,6 @@
                     const img = new Image(); img.src = ev.target.result;
                     img.onload = async () => { 
                         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                        /* 【修改处 2】清晰度提升到 2000 像素 */
                         const maxW = 2000; 
                         const scale = maxW / img.width;
                         canvas.width = maxW; canvas.height = img.height * scale;
@@ -230,6 +229,7 @@
                         const compressed = canvas.toDataURL('image/jpeg', 0.7); 
                         
                         const bgId = `bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`;
+                        // 更新：同时更新本地和云端，强制所有端同步新背景
                         localStorage.setItem(bgId, compressed); 
                         await _db.from('configs').upsert([{ id: bgId, value: compressed }]);
                         updateDisplayBg(); 
@@ -238,13 +238,22 @@
             }; i.click(); 
         }
 
+        // 修改：强制优先从云端获取最新背景
         async function updateDisplayBg() { 
             const bgId = `bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`;
-            let s = localStorage.getItem(bgId);
-            if(!s) {
-                const { data } = await _db.from('configs').select('value').eq('id', bgId).single();
-                if(data && data.value) { s = data.value; localStorage.setItem(bgId, s); }
+            
+            // 每次都去云端查一下最新的，确保换图后能即时更新
+            const { data, error } = await _db.from('configs').select('value').eq('id', bgId).single();
+            let s = null;
+            
+            if(data && data.value) {
+                s = data.value;
+                localStorage.setItem(bgId, s); // 拿到最新的，同步给本地
+            } else {
+                // 如果云端没图（比如新月份），才看本地有没有老图缓存（通常也是空的）
+                s = localStorage.getItem(bgId);
             }
+
             if(s){ 
                 document.getElementById('bg-layer').style.backgroundImage=`url(${s})`; 
                 document.getElementById('body-tag').classList.add('has-bg'); 
