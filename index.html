@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* 1:1 保持 index0410.txt 的样式 */
+        /* 样式部分完全未动，保持 index0410.txt 原样 */
         #bg-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #fdf6e3; background-size: cover; background-position: center; z-index: -1; transition: 0.5s; }
         body { margin: 0; padding: 20px 8px; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; box-sizing: border-box; }
         .calendar-box { background: white; width: calc(100vw - 16px); max-width: 1000px; padding: 12px 8px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); position: relative; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; }
@@ -123,12 +123,15 @@
         let currentDate = new Date(), viewMode = 'month', selection = [], currentBarColor = '#B2F2BB', editingId = null, events = [];
         let isAdmin = localStorage.getItem('is_admin') === 'true';
 
+        // 初始化及云端背景读取逻辑
         async function syncData() {
             const { data } = await _db.from('events').select('*');
             events = data || [];
+            await updateDisplayBg(); // 渲染前先更新背景
             if(viewMode === 'year') renderYear(); else renderCalendar();
         }
 
+        // 农历逻辑保持原样
         function getLunar(y, m, d) {
             const dateObj = new Date(y, m, d);
             const lunar = new Intl.DateTimeFormat('zh-u-ca-chinese', {day:'numeric'}).format(dateObj);
@@ -142,7 +145,6 @@
         }
 
         function renderCalendar() {
-            updateDisplayBg();
             const grid = document.getElementById('dateGrid'), layer = document.getElementById('event-layer');
             grid.innerHTML = ''; layer.innerHTML = '';
             const y = currentDate.getFullYear(), m = currentDate.getMonth();
@@ -187,9 +189,7 @@
         }
 
         function openEditModal(id, s, e) {
-            // 【权限补丁】如果没登录，点击现有条目也不准打开弹窗
             if (!isAdmin) return;
-
             editingId = id; const f = document.getElementById('editor-field');
             const sS = document.getElementById('startDaySelect'), eS = document.getElementById('endDaySelect');
             sS.innerHTML = eS.innerHTML = ''; for(let i=1;i<=31;i++){ sS.innerHTML+=`<option value="${i}">${i}</option>`; eS.innerHTML+=`<option value="${i}">${i}</option>`; }
@@ -207,18 +207,63 @@
             document.getElementById('editor-modal').style.display = 'block';
         }
 
-        function setStyle(e, p, v) { 
-            e.preventDefault(); const sel = window.getSelection(); if (!sel.rangeCount || sel.toString().length === 0) return; 
-            const range = sel.getRangeAt(0); const span = document.createElement('span'); 
-            span.style[p] = v; span.style.lineHeight = "1.2"; 
-            try { span.appendChild(range.extractContents()); range.insertNode(span); sel.removeAllRanges(); } catch (err) {} 
-        }
+        // 文字工具逻辑保持原样
+        function setStyle(e, p, v) { e.preventDefault(); const sel = window.getSelection(); if (!sel.rangeCount || sel.toString().length === 0) return; const range = sel.getRangeAt(0); const span = document.createElement('span'); span.style[p] = v; span.style.lineHeight = "1.2"; try { span.appendChild(range.extractContents()); range.insertNode(span); sel.removeAllRanges(); } catch (err) {} }
         function exec(e, c) { e.preventDefault(); document.execCommand(c, false, null); }
         function setAlign(e,v){ e.preventDefault(); document.getElementById('editor-field').style.alignItems=v; }
         function setBarColor(c) { currentBarColor = c; }
         function updateBlur(v){ const box = document.getElementById('mainBox'); box.style.backdropFilter = `blur(${v}px)`; box.style.webkitBackdropFilter = `blur(${v}px)`; localStorage.setItem('my_calendar_blur', v); }
-        function changeBg(){ const i=document.createElement("input"); i.type="file"; i.onchange=e=>{ const r=new FileReader(); r.onload=ev=>{ const img = new Image(); img.src = ev.target.result; img.onload = () => { const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d'); const maxW = 1200; const scale = maxW / img.width; canvas.width = maxW; canvas.height = img.height * scale; ctx.drawImage(img, 0, 0, canvas.width, canvas.height); const compressed = canvas.toDataURL('image/jpeg', 0.7); localStorage.setItem(`bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`, compressed); updateDisplayBg(); }; }; r.readAsDataURL(e.target.files[0]); }; i.click(); }
-        function updateDisplayBg() { const s = localStorage.getItem(`bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`); if(s){ document.getElementById('bg-layer').style.backgroundImage=`url(${s})`; document.getElementById('body-tag').classList.add('has-bg'); updateBlur(localStorage.getItem('my_calendar_blur') || 4); } else { document.getElementById('bg-layer').style.backgroundImage='none'; document.getElementById('body-tag').classList.remove('has-bg'); } }
+
+        // 背景云端同步逻辑：上传
+        function changeBg(){ 
+            if(!isAdmin) return alert("请先解锁权限");
+            const i=document.createElement("input"); i.type="file"; 
+            i.onchange=e=>{ 
+                const r=new FileReader(); 
+                r.onload=ev=>{ 
+                    const img = new Image(); img.src = ev.target.result;
+                    img.onload = async () => { 
+                        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                        const maxW = 1200; const scale = maxW / img.width;
+                        canvas.width = maxW; canvas.height = img.height * scale;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const compressed = canvas.toDataURL('image/jpeg', 0.7); 
+                        
+                        const bgId = `bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`;
+                        localStorage.setItem(bgId, compressed); 
+                        // 同步到 Supabase 
+                        await _db.from('configs').upsert([{ id: bgId, value: compressed }]);
+                        updateDisplayBg(); 
+                    }; 
+                }; r.readAsDataURL(e.target.files[0]); 
+            }; i.click(); 
+        }
+
+        // 背景云端同步逻辑：读取
+        async function updateDisplayBg() { 
+            const bgId = `bg_${currentDate.getFullYear()}_${currentDate.getMonth()}`;
+            let s = localStorage.getItem(bgId);
+            
+            // 如果本地没有，去云端看看
+            if(!s) {
+                const { data } = await _db.from('configs').select('value').eq('id', bgId).single();
+                if(data && data.value) {
+                    s = data.value;
+                    localStorage.setItem(bgId, s); // 存入本地缓存提高下次加载速度
+                }
+            }
+
+            if(s){ 
+                document.getElementById('bg-layer').style.backgroundImage=`url(${s})`; 
+                document.getElementById('body-tag').classList.add('has-bg'); 
+                updateBlur(localStorage.getItem('my_calendar_blur') || 4); 
+            } else { 
+                document.getElementById('bg-layer').style.backgroundImage='none'; 
+                document.getElementById('body-tag').classList.remove('has-bg'); 
+            } 
+        }
+
+        // 其他功能逻辑保持原样
         function exportData(){ const b=new Blob([JSON.stringify(events)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='calendar_backup.json'; a.click(); }
         function importData(){ const i=document.createElement('input'); i.type='file'; i.onchange=e=>{ const r=new FileReader(); r.onload=async ev=>{ const newData=JSON.parse(ev.target.result); for(let d of newData){ await _db.from('events').upsert(d); } syncData(); }; r.readAsText(e.target.files[0]); }; i.click(); }
         function toggleView() { viewMode=(viewMode==='month'?'year':'month'); document.getElementById('monthView').style.display=(viewMode==='month'?'block':'none'); document.getElementById('yearView').style.display=(viewMode==='year'?'grid':'none'); syncData(); }
